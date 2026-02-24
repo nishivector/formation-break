@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Formation Break</title>
+  <script src="https://cdn.jsdelivr.net/npm/tone@15.1.22/dist/Tone.js"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.183.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.183.0/examples/jsm/"
+    }
+  }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      overflow: hidden;
+      background: #0a0a0f;
+      font-family: 'Orbitron', monospace;
+    }
+    
+    canvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      touch-action: none;
+    }
+    
+    #startScreen {
+      position: fixed; inset: 0;
+      background: linear-gradient(180deg, rgba(0,0,20,0.85) 0%, rgba(0,0,10,0.6) 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    
+    #startScreen.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.6s;
+    }
+    
+    #gameTitle {
+      font-size: clamp(32px, 8vw, 72px);
+      font-weight: 900;
+      color: #00ffff;
+      text-shadow: 0 0 20px #00ffff, 0 0 40px #00ffff, 0 0 60px #00ffff;
+      letter-spacing: 8px;
+      animation: titlePulse 2s ease-in-out infinite, titleGlow 3s ease-in-out infinite alternate;
+      margin-bottom: 20px;
+    }
+    
+    @keyframes titlePulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+    }
+    
+    @keyframes titleGlow {
+      0% { text-shadow: 0 0 20px #00ffff, 0 0 40px #00ffff, 0 0 60px #00ffff; }
+      100% { text-shadow: 0 0 30px #00ffff, 0 0 60px #00ffff, 0 0 90px #00ffff, 0 0 120px #00ffff; }
+    }
+    
+    #tagline {
+      font-size: clamp(12px, 3vw, 18px);
+      color: rgba(255,255,255,0.6);
+      letter-spacing: 4px;
+      margin-bottom: 60px;
+    }
+    
+    #tapToStart {
+      font-size: clamp(14px, 3vw, 20px);
+      color: #ff0066;
+      animation: blink 1.5s ease-in-out infinite;
+      letter-spacing: 2px;
+    }
+    
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    
+    #gameUI {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 5;
+      display: none;
+    }
+    
+    #gameUI.active {
+      display: block;
+    }
+    
+    #scoreDisplay {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: #ffcc00;
+      font-size: clamp(16px, 4vw, 24px);
+      text-shadow: 0 0 10px #ffcc00;
+    }
+    
+    #levelDisplay {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      color: #00ffff;
+      font-size: clamp(14px, 3vw, 18px);
+      text-shadow: 0 0 10px #00ffff;
+    }
+    
+    #multiplierDisplay {
+      position: absolute;
+      top: 60px;
+      left: 20px;
+      color: #ff0066;
+      font-size: clamp(20px, 5vw, 32px);
+      text-shadow: 0 0 15px #ff0066;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    
+    #multiplierDisplay.show {
+      opacity: 1;
+    }
+    
+    #livesDisplay {
+      position: absolute;
+      top: 20px;
+      right: 80px;
+      color: #ff0066;
+      font-size: clamp(14px, 3vw, 18px);
+    }
+    
+    #targetingRing {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 120px;
+      height: 120px;
+      border: 3px solid #00ffff;
+      border-radius: 50%;
+      box-shadow: 0 0 20px #00ffff, inset 0 0 20px rgba(0,255,255,0.1);
+      pointer-events: none;
+    }
+    
+    #gameOverScreen, #winScreen, #creditsScreen {
+      position: fixed;
+      inset: 0;
+      background: rgba(10,10,15,0.95);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+    }
+    
+    #gameOverScreen.show, #winScreen.show, #creditsScreen.show {
+      display: flex;
+    }
+    
+    .screenTitle {
+      font-size: clamp(28px, 7vw, 48px);
+      font-weight: 900;
+      margin-bottom: 20px;
+      letter-spacing: 4px;
+    }
+    
+    #gameOverScreen .screenTitle {
+      color: #ff0066;
+      text-shadow: 0 0 20px #ff0066;
+    }
+    
+    #winScreen .screenTitle {
+      color: #00ffff;
+      text-shadow: 0 0 20px #00ffff;
+    }
+    
+    .finalScore {
+      font-size: clamp(18px, 4vw, 28px);
+      color: #ffcc00;
+      margin-bottom: 10px;
+    }
+    
+    .highScore {
+      font-size: clamp(14px, 3vw, 20px);
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 40px;
+    }
+    
+    .playAgain {
+      font-size: clamp(14px, 3vw, 18px);
+      color: #00ffff;
+      animation: blink 1.5s ease-in-out infinite;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+    
+    #creditsScreen .screenTitle {
+      color: #ffcc00;
+      text-shadow: 0 0 20px #ffcc00;
+    }
+    
+    .creditsText {
+      color: rgba(255,255,255,0.5);
+      font-size: clamp(10px, 2vw, 14px);
+      margin: 5px 0;
+    }
+    
+    .creditsBack {
+      margin-top: 40px;
+      color: #00ffff;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  
+  <div id="startScreen">
+    <div id="gameTitle">FORMATION BREAK</div>
+    <div id="tagline">The moment before the shatter</div>
+    <div id="tapToStart">TAP TO BEGIN</div>
+  </div>
+  
+  <div id="gameUI">
+    <div id="scoreDisplay">SCORE: 0</div>
+    <div id="levelDisplay">LEVEL 1</div>
+    <div id="multiplierDisplay">x1</div>
+    <div id="livesDisplay">♥ ♥ ♥</div>
+    <div id="targetingRing"></div>
+  </div>
+  
+  <div id="gameOverScreen">
+    <div class="screenTitle">FORMATION BREACHED</div>
+    <div class="finalScore">SCORE: <span id="finalScoreValue">0</span></div>
+    <div class="highScore">HIGH SCORE: <span id="highScoreValue">0</span></div>
+    <div class="playAgain" id="playAgainBtn">TAP TO RETRY</div>
+  </div>
+  
+  <div id="winScreen">
+    <div class="screenTitle">GRID CLEARED</div>
+    <div class="finalScore">FINAL SCORE: <span id="winScoreValue">0</span></div>
+    <div class="highScore">HIGH SCORE: <span id="winHighScoreValue">0</span></div>
+    <div class="playAgain" id="winPlayAgainBtn">TAP TO PLAY AGAIN</div>
+  </div>
+  
+  <div id="creditsScreen">
+    <div class="screenTitle">CREDITS</div>
+    <div class="creditsText">A game about timing</div>
+    <div class="creditsText">Built with Three.js + Tone.js</div>
+    <div class="creditsText">The Last Nexus — clearing the dead grid</div>
+    <div class="creditsBack" id="creditsBackBtn">TAP TO RETURN</div>
+  </div>
+  
+  <a href="https://github.com/nishivector/formation-break" target="_blank" style="
+    position: fixed; bottom: 16px; right: 16px;
+    color: rgba(255,255,255,0.4); font-size: 12px;
+    text-decoration: none; font-family: monospace;
+    z-index: 1000;
+  ">GitHub ↗</a>
+  
+  <script type="module">
+    import * as THREE from 'three';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+    
+    // Game state
+    let gameState = 'start';
+    let score = 0;
+    let lives = 3;
+    let level = 1;
+    let multiplier = 1;
+    let combo = 0;
+    let formations = [];
+    let particles = [];
+    let shockwaves = [];
+    let floatingTexts = [];
+    let audioInitialized = false;
+    let formationSpawnTimer = 0;
+    let currentFormationSpeed = 2.5;
+    
+    const SCORE_KEY = 'formation-break-highscore';
+    const LEVELS = [
+      { name: 'FIRST CONTACT', speed: 2.0, hollowChance: 0.0, angleVariation: 0, spawnRate: 2500 },
+      { name: 'HOLLOW FORMS', speed: 2.5, hollowChance: 0.4, angleVariation: 0, spawnRate: 2200 },
+      { name: 'DIAGONAL APPROACH', speed: 3.0, hollowChance: 0.5, angleVariation: 0.3, spawnRate: 2000 },
+      { name: 'DECOY CLUSTERS', speed: 3.5, hollowChance: 0.6, angleVariation: 0.5, spawnRate: 1800 },
+      { name: 'THE SWARM', speed: 4.0, hollowChance: 0.7, angleVariation: 0.7, spawnRate: 1500 }
+    ];
+    
+    // Three.js setup
+    const canvas = document.getElementById('gameCanvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x0a0a0f, 1);
+    
+    const scene = new THREE.Scene();
+    
+    // Camera with portrait mode support
+    let camera;
+    function createCamera() {
+      const aspect = window.innerWidth / window.innerHeight;
+      const fov = aspect < 1 ? 75 : 60;
+      const distance = aspect < 1 ? 12 : 10;
+      return new THREE.PerspectiveCamera(fov, aspect, 0.1, 1000);
+    }
+    camera = createCamera();
+    camera.position.z = 10;
+    
+    // Post-processing
+    const composer = new EffectComposer(renderer);
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+    
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      1.5, 0.4, 0.85
+    );
+    bloomPass.threshold = 0.1;
+    bloomPass.strength = 2.0;
+    bloomPass.radius = 0.8;
+    composer.addPass(bloomPass);
+    
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0x111122, 0.5);
+    scene.add(ambientLight);
+    
+    const pointLight = new THREE.PointLight(0x00ffff, 1, 50);
+    pointLight.position.set(0, 0, 10);
+    scene.add(pointLight);
+    
+    // Grid background
+    const gridGeometry = new THREE.PlaneGeometry(40, 40, 40, 40);
+    const gridMaterial = new THREE.MeshBasicMaterial({
+      color: 0x00ffff,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.05
+    });
+    const grid = new THREE.Mesh(gridGeometry, gridMaterial);
+    grid.position.z = -5;
+    scene.add(grid);
+    
+    // Targeting ring visual in 3D
+    const ringGeometry = new THREE.RingGeometry(2.3, 2.5, 64);
+    const ringMaterial = new THREE.MeshBasicMaterial({
+      color: 0x00ffff,
+      transparent: true,
+      opacity: 0.8,
+      side: THREE.DoubleSide
+    });
+    const targetRing = new THREE.Mesh(ringGeometry, ringMaterial);
+    targetRing.position.z = 0;
+    scene.add(targetRing);
+    
+    const innerRingGeometry = new THREE.RingGeometry(1.8, 1.85, 64);
+    const innerRing = new THREE.Mesh(innerRingGeometry, ringMaterial.clone());
+    innerRing.material.opacity = 0.3;
+    innerRing.position.z = 0;
+    scene.add(innerRing);
+    
+    // Formation creation
+    function createFormation() {
+      const levelData = LEVELS[level - 1];
+      const isHollow = Math.random() < levelData.hollowChance;
+      const hasDecoy = level >= 4 && Math.random() < 0.3;
+      const angle = (Math.random() - 0.5) * levelData.angleVariation;
+      
+      const group = new THREE.Group();
+      
+      // Formation type: square, ring, or cluster
+      const type = Math.floor(Math.random() * 3);
+      const size = 1.5 + Math.random() * 0.5;
+      const segments = 4 + Math.floor(Math.random() * 4);
+      
+      if (type === 0) {
+        // Square formation
+        for (let i = 0; i < segments; i++) {
+          for (let j = 0; j < segments; j++) {
+            if (isHollow && i > 0 && i < segments - 1 && j > 0 && j < segments - 1) continue;
+            if (hasDecoy && i > 1 && i < segments - 2 && j > 1 && j < segments - 2) continue;
+            
+            const enemyGeom = new THREE.OctahedronGeometry(0.2);
+            const enemyMat = new THREE.MeshBasicMaterial({
+              color: 0xff0066,
+              transparent: true,
+              opacity: 0.9
+            });
+            const enemy = new THREE.Mesh(enemyGeom, enemyMat);
+            enemy.position.set(
+              (i - segments / 2 + 0.5) * size,
+              (j - segments / 2 + 0.5) * size,
+              0
+            );
+            group.add(enemy);
+          }
+        }
+      } else if (type === 1) {
+        // Ring formation
+        const ringSegments = 12 + Math.floor(Math.random() * 8);
+        const radius = size * 1.5;
+        for (let i = 0; i < ringSegments; i++) {
+          const theta = (i / ringSegments) * Math.PI * 2;
+          const enemyGeom = new THREE.OctahedronGeometry(0.2);
+          const enemyMat = new THREE.MeshBasicMaterial({
+            color: 0xff0066,
+            transparent: true,
+            opacity: 0.9
+          });
+          const enemy = new THREE.Mesh(enemyGeom, enemyMat);
+          enemy.position.set(
+            Math.cos(theta) * radius,
+            Math.sin(theta) * radius,
+            0
+          );
+          group.add(enemy);
+        }
+      } else {
+        // Cluster formation
+        const clusterCount = 5 + Math.floor(Math.random() * 5);
+        for (let i = 0; i < clusterCount; i++) {
+          const enemyGeom = new THREE.OctahedronGeometry(0.2);
+          const enemyMat = new THREE.MeshBasicMaterial({
+            color: 0xff0066,
+            transparent: true,
+            opacity: 0.9
+          });
+          const enemy = new THREE.Mesh(enemyGeom, enemyMat);
+          const spread = size * 0.8;
+          enemy.position.set(
+            (Math.random() - 0.5) * spread,
+            (Math.random() - 0.5) * spread,
+            0
+          );
+          if (hasDecoy && i < 2) {
+            enemy.material.opacity = 0.3;
+            enemy.userData.isDecoy = true;
+          }
+          group.add(enemy);
+        }
+      }
+      
+      group.userData = {
+        speed: currentFormationSpeed,
+        angle: angle,
+        isHollow: isHollow,
+        hasDecoy: hasDecoy,
+        rotationSpeed: (Math.random() - 0.5) * 0.02
+      };
+      
+      // Start position
+      const startX = (Math.random() - 0.5) * 8;
+      group.position.set(startX, 12, 0);
+      
+      // Apply rotation for diagonal approach
+      group.rotation.z = angle;
+      
+      scene.add(group);
+      formations.push(group);
+    }
+    
+    // Particle explosion
+    function createExplosion(position, count = 15) {
+      for (let i = 0; i < count; i++) {
+        const geom = new THREE.TetrahedronGeometry(0.1);
+        const mat = new THREE.MeshBasicMaterial({
+          color: 0xff0066,
+          transparent: true,
+          opacity: 1
+        });
+        const particle = new THREE.Mesh(geom, mat);
+        particle.position.copy(position);
+        
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.1 + Math.random() * 0.2;
+        particle.userData = {
+          velocity: new THREE.Vector3(
+            Math.cos(angle) * speed,
+            Math.sin(angle) * speed,
+            (Math.random() - 0.5) * speed
+          ),
+          life: 1.0,
+          decay: 0.02 + Math.random() * 0.02
+        };
+        
+        scene.add(particle);
+        particles.push(particle);
+      }
+    }
+    
+    // Shockwave effect
+    function createShockwave() {
+      const geometry = new THREE.RingGeometry(0.1, 0.3, 64);
+      const material = new THREE.MeshBasicMaterial({
+        color: 0x00ffff,
+        transparent: true,
+        opacity: 1,
+        side: THREE.DoubleSide
+      });
+      const shockwave = new THREE.Mesh(geometry, material);
+      shockwave.position.z = 0.1;
+      shockwave.userData = {
+        scale: 0.1,
+        maxScale: 15,
+        speed: 0.5
+      };
+      scene.add(shockwave);
+      shockwaves.push(shockwave);
+    }
+    
+    // Floating text
+    function createFloatingText(position, text, color = 0xffcc00) {
+      const canvas2d = document.createElement('canvas');
+      canvas2d.width = 256;
+      canvas2d.height = 64;
+      const ctx = canvas2d.getContext('2d');
+      ctx.font = 'bold 48px Orbitron, monospace';
+      ctx.fillStyle = '#' + color.toString(16).padStart(6, '0');
+      ctx.textAlign = 'center';
+      ctx.fillText(text, 128, 48);
+      
+      const texture = new THREE.CanvasTexture(canvas2d);
+      const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
+      const sprite = new THREE.Sprite(spriteMaterial);
+      sprite.position.copy(position);
+      sprite.position.z = 1;
+      sprite.scale.set(2, 0.5, 1);
+      sprite.userData = {
+        life: 1.0,
+        velocity: new THREE.Vector3(0, 0.05, 0)
+      };
+      
+      scene.add(sprite);
+      floatingTexts.push(sprite);
+    }
+    
+    // Audio
+    let synth, reverb, noiseSynth;
+    
+    async function initAudio() {
+      if (audioInitialized) return;
+      
+      await Tone.start();
+      
+      reverb = new Tone.Reverb({ decay: 2, wet: 0.3 }).toDestination();
+      
+      synth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 0.5 },
+        volume: -12
+      });
+      synth.connect(reverb);
+      
+      noiseSynth = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.2 },
+        volume: -20
+      });
+      noiseSynth.connect(reverb);
+      
+      // Start ambient drone
+      const drone = new Tone.Oscillator(55, 'sine').toDestination();
+      drone.volume.value = -25;
+      drone.start();
+      const lfo = new Tone.LFO(0.5, 55).connect(drone.frequency);
+      lfo.start();
+      
+      audioInitialized = true;
+    }
+    
+    function playShockwaveSound() {
+      if (!audioInitialized) return;
+      synth.triggerAttackRelease(['C2'], '16n');
+    }
+    
+    function playShatterSound(hitCount) {
+      if (!audioInitialized) return;
+      const notes = ['G4', 'C5', 'E5', 'G5'];
+      for (let i = 0; i < Math.min(hitCount, 4); i++) {
+        setTimeout(() => {
+          synth.triggerAttackRelease(notes[i], '32n');
+        }, i * 30);
+      }
+    }
+    
+    function playMissSound() {
+      if (!audioInitialized) return;
+      noiseSynth.triggerAttackRelease('8n');
+    }
+    
+    // Game logic
+    function checkCollision(formation) {
+      const centerY = formation.position.y;
+      const ringRadius = 2.5;
+      
+      // Formation has passed the ring
+      if (centerY < -3) {
+        return 'miss';
+      }
+      
+      // Check if formation is in the targeting zone (within ring radius)
+      if (Math.abs(centerY) < ringRadius && Math.abs(formation.position.x) < ringRadius) {
+        // Calculate how "centered" the formation is
+        const distanceFromCenter = Math.sqrt(
+          formation.position.x * formation.position.x + 
+          centerY * centerY
+        );
+        
+        if (distanceFromCenter < ringRadius * 0.5) {
+          return 'perfect';
+        } else if (distanceFromCenter < ringRadius) {
+          return 'hit';
+        }
+      }
+      
+      return null;
+    }
+    
+    function triggerShockwave() {
+      createShockwave();
+      playShockwaveSound();
+      
+      let hitCount = 0;
+      
+      formations.forEach((formation, index) => {
+        const collision = checkCollision(formation);
+        if (collision === 'perfect' || collision === 'hit') {
+          // Check each enemy in the formation
+          let formationHits = 0;
+          formation.children.forEach(enemy => {
+            const enemyWorldPos = new THREE.Vector3();
+            enemy.getWorldPosition(enemyWorldPos);
+            
+            const distFromCenter = Math.sqrt(
+              enemyWorldPos.x * enemyWorldPos.x + 
+              enemyWorldPos.y * enemyWorldPos.y
+            );
+            
+            // Only count if within shockwave radius and not a decoy
+            if (distFromCenter < 3 && !enemy.userData.isDecoy) {
+              formationHits++;
+            }
+          });
+          
+          if (formationHits > 0) {
+            hitCount += formationHits;
+            combo++;
+            multiplier = Math.min(1 + Math.floor(combo / 3), 8);
+            
+            const points = formationHits * 100 * multiplier * (collision === 'perfect' ? 2 : 1);
+            score += points;
+            
+            createFloatingText(
+              new THREE.Vector3(0, 0, 0),
+              `+${points}`,
+              0xffcc00
+            );
+            
+            if (multiplier > 1) {
+              createFloatingText(
+                new THREE.Vector3(0, 1, 0),
+                `x${multiplier}`,
+                0xff0066
+              );
+            }
+            
+            createExplosion(formation.position, formationHits * 3);
+            scene.remove(formation);
+            formations.splice(index, 1);
+          }
+        }
+      });
+      
+      if (hitCount > 0) {
+        playShatterSound(hitCount);
+      } else {
+        combo = 0;
+        multiplier = 1;
+      }
+      
+      updateUI();
+    }
+    
+    function updateUI() {
+      document.getElementById('scoreDisplay').textContent = `SCORE: ${score}`;
+      document.getElementById('levelDisplay').textContent = `LEVEL ${level}`;
+      document.getElementById('multiplierDisplay').textContent = `x${multiplier}`;
+      document.getElementById('multiplierDisplay').classList.toggle('show', multiplier > 1);
+      
+      let hearts = '';
+      for (let i = 0; i < lives; i++) hearts += '♥ ';
+      document.getElementById('livesDisplay').textContent = hearts;
+    }
+    
+    function handleMiss() {
+      lives--;
+      combo = 0;
+      multiplier = 1;
+      playMissSound();
+      updateUI();
+      
+      if (lives <= 0) {
+        gameOver();
+      }
+    }
+    
+    function gameOver() {
+      gameState = 'gameover';
+      saveHighScore(score);
+      
+      document.getElementById('finalScoreValue').textContent = score;
+      document.getElementById('highScoreValue').textContent = getHighScore();
+      document.getElementById('gameOverScreen').classList.add('show');
+      document.getElementById('gameUI').classList.remove('active');
+    }
+    
+    function winGame() {
+      gameState = 'win';
+      saveHighScore(score);
+      
+      document.getElementById('winScoreValue').textContent = score;
+      document.getElementById('winHighScoreValue').textContent = getHighScore();
+      document.getElementById('winScreen').classList.add('show');
+      document.getElementById('gameUI').classList.remove('active');
+    }
+    
+    function resetGame() {
+      score = 0;
+      lives = 3;
+      level = 1;
+      multiplier = 1;
+      combo = 0;
+      formationSpawnTimer = 0;
+      currentFormationSpeed = LEVELS[0].speed;
+      
+      formations.forEach(f => scene.remove(f));
+      formations = [];
+      particles.forEach(p => scene.remove(p));
+      particles = [];
+      shockwaves.forEach(s => scene.remove(s));
+      shockwaves = [];
+      floatingTexts.forEach(t => scene.remove(t));
+      floatingTexts = [];
+      
+      updateUI();
+    }
+    
+    function startLevel(lvl) {
+      level = lvl;
+      currentFormationSpeed = LEVELS[level - 1].speed;
+      formations.forEach(f => scene.remove(f));
+      formations = [];
+    }
+    
+    function checkLevelComplete() {
+      if (level < 5 && score >= level * 2000) {
+        startLevel(level + 1);
+      } else if (level === 5 && formations.length === 0 && score >= 10000) {
+        winGame();
+      }
+    }
+    
+    // Local scoreboard
+    function getHighScore() {
+      return parseInt(localStorage.getItem(SCORE_KEY) || '0');
+    }
+    
+    function saveHighScore(s) {
+      if (s > getHighScore()) {
+        localStorage.setItem(SCORE_KEY, s);
+      }
+    }
+    
+    // Input handling
+    function getCanvasPos(e, canvas) {
+      const rect = canvas.getBoundingClientRect();
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+    
+    function onPointerDown(e) {
+      const pos = getCanvasPos(e, canvas);
+      
+      if (gameState === 'start') {
+        gameState = 'playing';
+        document.getElementById('startScreen').classList.add('hidden');
+        document.getElementById('gameUI').classList.add('active');
+        initAudio().catch(() => {});
+        return;
+      }
+      
+      if (gameState === 'playing') {
+        triggerShockwave();
+        return;
+      }
+    }
+    
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', () => {});
+    canvas.addEventListener('pointerup', () => {});
+    canvas.addEventListener('pointercancel', () => {});
+    
+    // UI click handlers
+    document.getElementById('playAgainBtn').addEventListener('pointerdown', () => {
+      document.getElementById('gameOverScreen').classList.remove('show');
+      resetGame();
+      gameState = 'playing';
+      document.getElementById('gameUI').classList.add('active');
+    });
+    
+    document.getElementById('winPlayAgainBtn').addEventListener('pointerdown', () => {
+      document.getElementById('winScreen').classList.remove('show');
+      resetGame();
+      gameState = 'playing';
+      document.getElementById('gameUI').classList.add('active');
+    });
+    
+    // Animation loop
+    let lastTime = 0;
+    let spawnAccumulator = 0;
+    
+    function animate(time) {
+      requestAnimationFrame(animate);
+      
+      const delta = (time - lastTime) / 1000;
+      lastTime = time;
+      
+      // Idle animations
+      const breathe = Math.sin(time * 0.002) * 0.1 + 1;
+      targetRing.scale.set(breathe, breathe, 1);
+      targetRing.rotation.z = Math.sin(time * 0.001) * 0.1;
+      innerRing.rotation.z = -Math.sin(time * 0.0015) * 0.15;
+      
+      grid.rotation.z = time * 0.00005;
+      
+      // Update formations
+      if (gameState === 'playing') {
+        spawnAccumulator += delta * 1000;
+        const spawnRate = LEVELS[level - 1].spawnRate;
+        
+        if (spawnAccumulator >= spawnRate && formations.length < 3) {
+          createFormation();
+          spawnAccumulator = 0;
+        }
+        
+        formations.forEach((formation, index) => {
+          formation.position.y -= formation.userData.speed * delta;
+          formation.rotation.z += formation.userData.rotationSpeed;
+          
+          // Check if missed
+          if (formation.position.y < -8) {
+            handleMiss();
+            scene.remove(formation);
+            formations.splice(index, 1);
+          }
+        });
+        
+        checkLevelComplete();
+      }
+      
+      // Update particles
+      particles.forEach((particle, index) => {
+        particle.position.add(particle.userData.velocity);
+        particle.userData.velocity.y -= 0.005;
+        particle.userData.life -= particle.userData.decay;
+        particle.material.opacity = particle.userData.life;
+        particle.rotation.x += 0.1;
+        particle.rotation.y += 0.1;
+        
+        if (particle.userData.life <= 0) {
+          scene.remove(particle);
+          particles.splice(index, 1);
+        }
+      });
+      
+      // Update shockwaves
+      shockwaves.forEach((shockwave, index) => {
+        shockwave.userData.scale += shockwave.userData.speed;
+        shockwave.scale.set(shockwave.userData.scale, shockwave.userData.scale, 1);
+        shockwave.material.opacity = 1 - (shockwave.userData.scale / shockwave.userData.maxScale);
+        
+        if (shockwave.userData.scale >= shockwave.userData.maxScale) {
+          scene.remove(shockwave);
+          shockwaves.splice(index, 1);
+        }
+      });
+      
+      // Update floating texts
+      floatingTexts.forEach((text, index) => {
+        text.position.add(text.userData.velocity);
+        text.userData.life -= 0.02;
+        text.material.opacity = text.userData.life;
+        
+        if (text.userData.life <= 0) {
+          scene.remove(text);
+          floatingTexts.splice(index, 1);
+        }
+      });
+      
+      composer.render();
+    }
+    
+    // Handle resize
+    window.addEventListener('resize', () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      
+      renderer.setSize(width, height);
+      composer.setSize(width, height);
+      
+      camera.aspect = width / height;
+      camera.fov = width / height < 1 ? 75 : 60;
+      camera.updateProjectionMatrix();
+    });
+    
+    animate(0);
+  </script>
+</body>
+</html>
