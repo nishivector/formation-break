@@ -812,6 +812,9 @@
     canvas.addEventListener('pointerup', () => {});
     canvas.addEventListener('pointercancel', () => {});
     
+    // Start screen click handler
+    document.getElementById('startScreen').addEventListener('pointerdown', onPointerDown);
+    
     // UI click handlers
     document.getElementById('playAgainBtn').addEventListener('pointerdown', () => {
       document.getElementById('gameOverScreen').classList.remove('show');
