@@ -813,7 +813,13 @@
     canvas.addEventListener('pointercancel', () => {});
     
     // Start screen click handler
-    document.getElementById('startScreen').addEventListener('pointerdown', onPointerDown);
+    function startGameClick() {
+      console.log('Start screen clicked!');
+      onPointerDown({ clientX: window.innerWidth/2, clientY: window.innerHeight/2 });
+    }
+    document.getElementById('startScreen').addEventListener('pointerdown', startGameClick);
+    document.getElementById('startScreen').addEventListener('click', startGameClick);
+    document.getElementById('startScreen').style.cursor = 'pointer';
     
     // UI click handlers
     document.getElementById('playAgainBtn').addEventListener('pointerdown', () => {
