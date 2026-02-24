@@ -228,7 +228,7 @@
 <body>
   <canvas id="gameCanvas"></canvas>
   
-  <div id="startScreen">
+  <div id="startScreen" onclick="handleStartClick()">
     <div id="gameTitle">FORMATION BREAK</div>
     <div id="tagline">The moment before the shatter</div>
     <div id="tapToStart">TAP TO BEGIN</div>
@@ -814,12 +814,17 @@
     canvas.addEventListener('pointercancel', () => {});
     
     // Start screen click handler
-    function startGameClick() {
-      console.log('Start screen clicked!');
-      onPointerDown({ clientX: window.innerWidth/2, clientY: window.innerHeight/2 });
+    function handleStartClick() {
+      console.log('Start screen clicked via onclick!');
+      if (gameState === 'start') {
+        gameState = 'playing';
+        document.getElementById('startScreen').classList.add('hidden');
+        document.getElementById('gameUI').classList.add('active');
+        initAudio().catch(() => {});
+      }
     }
-    document.getElementById('startScreen').addEventListener('pointerdown', startGameClick);
-    document.getElementById('startScreen').addEventListener('click', startGameClick);
+    document.getElementById('startScreen').addEventListener('pointerdown', handleStartClick);
+    document.getElementById('startScreen').addEventListener('click', handleStartClick);
     document.getElementById('startScreen').style.cursor = 'pointer';
     
     // UI click handlers
