@@ -827,6 +827,13 @@
     document.getElementById('startScreen').addEventListener('click', handleStartClick);
     document.getElementById('startScreen').style.cursor = 'pointer';
     
+    // Auto-start fallback after 5 seconds
+    setTimeout(() => {
+      if (gameState === 'start') {
+        handleStartClick();
+      }
+    }, 5000);
+    
     // UI click handlers
     document.getElementById('playAgainBtn').addEventListener('pointerdown', () => {
       document.getElementById('gameOverScreen').classList.remove('show');
