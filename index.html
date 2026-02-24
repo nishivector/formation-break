@@ -815,10 +815,10 @@
     
     // Start screen click handler
     function handleStartClick() {
-      console.log('Start screen clicked via onclick!');
+      console.log('Start screen clicked!');
       if (gameState === 'start') {
         gameState = 'playing';
-        document.getElementById('startScreen').classList.add('hidden');
+        document.getElementById('startScreen').style.display = 'none';
         document.getElementById('gameUI').classList.add('active');
         initAudio().catch(() => {});
       }
